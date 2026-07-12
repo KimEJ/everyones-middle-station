@@ -1,0 +1,28 @@
+{
+  "name": "everyones-middle-station",
+  "version": "0.1.0",
+  "description": "여러 출발지에서 공평한 만남 역을 찾는 MCP 서버 MVP",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22.18.0"
+  },
+  "scripts": {
+    "dev": "node --watch --enable-source-maps src/index.ts --transport=http",
+    "build": "tsc -p tsconfig.build.json",
+    "test": "vitest run",
+    "start": "node --enable-source-maps dist/index.js --transport=http",
+    "typecheck": "tsc --noEmit",
+    "lint": "biome check src tests"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.4.4",
+    "@types/node": "^25.0.0",
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.10"
+  }
+}
