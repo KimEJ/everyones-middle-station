@@ -32,6 +32,21 @@ describe("MCP server tools", () => {
           "explain_fairness_score",
         ]),
       )
+      const toolsByName = new Map(tools.tools.map((tool) => [tool.name, tool]))
+      for (const toolName of [
+        "find_fair_meeting_areas",
+        "compare_meeting_areas",
+        "explain_fairness_score",
+      ]) {
+        const tool = toolsByName.get(toolName)
+        expect(tool?.description).toContain("모두의 중간역")
+        expect(tool?.annotations).toMatchObject({
+          readOnlyHint: true,
+          destructiveHint: false,
+          idempotentHint: true,
+          openWorldHint: false,
+        })
+      }
       expect(result.isError).toBeUndefined()
       expect(result.structuredContent).toMatchObject({
         algorithm: "그래프 기반 최단시간 추정",

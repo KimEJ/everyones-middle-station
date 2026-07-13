@@ -20,6 +20,13 @@ import {
 export const SERVER_NAME = "everyones-middle-station"
 export const SERVER_VERSION = "0.1.0"
 
+const READ_ONLY_TOOL_ANNOTATIONS = {
+  readOnlyHint: true,
+  destructiveHint: false,
+  idempotentHint: true,
+  openWorldHint: false,
+} as const
+
 export function createMcpServer(
   travelTimeAdapter: TravelTimeAdapter,
   requestSignal?: AbortSignal,
@@ -32,8 +39,9 @@ export function createMcpServer(
     {
       title: "공평한 만남 역 찾기",
       description:
-        "여러 출발역의 평균 이동시간과 최대 편차를 함께 고려해 공평한 만남 역을 추천합니다.",
+        "모두의 중간역이 여러 출발역의 평균 이동시간과 최대 편차를 함께 고려해 공평한 만남 역을 추천합니다.",
       inputSchema: FindFairMeetingAreasInputSchema,
+      annotations: READ_ONLY_TOOL_ANNOTATIONS,
     },
     async (input, extra) =>
       executeTool(async () => {
@@ -67,8 +75,10 @@ export function createMcpServer(
     "compare_meeting_areas",
     {
       title: "지정 만남 역 비교",
-      description: "지정한 후보역을 같은 출발지와 공정성 산식으로 비교해 순위를 반환합니다.",
+      description:
+        "모두의 중간역이 지정한 후보역을 같은 출발지와 공정성 산식으로 비교해 순위를 반환합니다.",
       inputSchema: CompareMeetingAreasInputSchema,
+      annotations: READ_ONLY_TOOL_ANNOTATIONS,
     },
     async (input, extra) =>
       executeTool(async () => {
@@ -92,8 +102,10 @@ export function createMcpServer(
     "explain_fairness_score",
     {
       title: "공정성 점수 설명",
-      description: "fairness_score 산식과 평균 이동시간 및 사람 간 편차의 영향을 설명합니다.",
+      description:
+        "모두의 중간역의 fairness_score 산식과 평균 이동시간 및 사람 간 편차의 영향을 설명합니다.",
       inputSchema: ExplainFairnessScoreInputSchema,
+      annotations: READ_ONLY_TOOL_ANNOTATIONS,
     },
     async (input) =>
       executeTool(async () => {
