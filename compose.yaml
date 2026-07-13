@@ -1,0 +1,9 @@
+services:
+  mcp:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: everyones-middle-station:local
+    platform: linux/amd64
+    ports:
+      - "3000:3000"

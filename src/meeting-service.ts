@@ -1,5 +1,9 @@
 import type { Station, TravelTimeAdapter } from "./domain.ts"
-import { TravelTimeLookupTimeoutError, UnknownStationError } from "./errors.ts"
+import {
+  RouteUnavailableError,
+  TravelTimeLookupTimeoutError,
+  UnknownStationError,
+} from "./errors.ts"
 import { calculateFairnessScore, type FairnessBreakdown, roundToOneDecimal } from "./fairness.ts"
 
 export type FindMeetingAreasRequest = {
@@ -31,6 +35,22 @@ type Origin = {
   readonly station: Station
 }
 
+type AvailableEstimate = {
+  readonly kind: "available"
+  readonly candidateId: Station["id"]
+  readonly originIndex: number
+  readonly origin: string
+  readonly minutes: number
+}
+
+type UnavailableEstimate = {
+  readonly kind: "unavailable"
+  readonly candidateId: Station["id"]
+  readonly error: RouteUnavailableError
+}
+
+type EstimateResult = AvailableEstimate | UnavailableEstimate
+
 const MAX_CONCURRENT_TRAVEL_TIME_LOOKUPS = 6
 
 export class MeetingAreaService {
@@ -45,12 +65,19 @@ export class MeetingAreaService {
     signal?: AbortSignal,
   ): Promise<readonly MeetingAreaCandidate[]> {
     const origins = this.resolveOrigins(request.originNames)
-    const candidates =
-      request.candidateNames === undefined
-        ? this.travelTimeAdapter.listStations()
-        : this.resolveStations(request.candidateNames)
+    if (request.candidateNames === undefined) {
+      return (
+        await this.evaluate(origins, this.travelTimeAdapter.listStations(), signal, {
+          omitUnavailableCandidates: true,
+        })
+      ).slice(0, request.maxCandidates)
+    }
 
-    return (await this.evaluate(origins, candidates, signal)).slice(0, request.maxCandidates)
+    return (
+      await this.evaluate(origins, this.resolveStations(request.candidateNames), signal, {
+        omitUnavailableCandidates: false,
+      })
+    ).slice(0, request.maxCandidates)
   }
 
   async compareAreas(
@@ -61,6 +88,7 @@ export class MeetingAreaService {
       this.resolveOrigins(request.originNames),
       this.resolveStations(request.candidateNames),
       signal,
+      { omitUnavailableCandidates: false },
     )
   }
 
@@ -94,6 +122,7 @@ export class MeetingAreaService {
     origins: readonly Origin[],
     candidates: readonly Station[],
     signal: AbortSignal | undefined,
+    options: { readonly omitUnavailableCandidates: boolean },
   ): Promise<readonly MeetingAreaCandidate[]> {
     const estimateTasks = candidates.flatMap((candidate) =>
       origins.map((origin, originIndex) => ({ candidate, origin, originIndex })),
@@ -101,38 +130,68 @@ export class MeetingAreaService {
     const estimates = await mapWithConcurrency(
       estimateTasks,
       MAX_CONCURRENT_TRAVEL_TIME_LOOKUPS,
-      async (task) => ({
-        candidateId: task.candidate.id,
-        originIndex: task.originIndex,
-        origin: task.origin.requestedName,
-        minutes: await resolveEstimate(
-          signal === undefined
-            ? this.travelTimeAdapter.estimateMinutes(task.origin.station.id, task.candidate.id)
-            : this.travelTimeAdapter.estimateMinutes(task.origin.station.id, task.candidate.id, {
-                signal,
-              }),
-          signal,
-        ),
-      }),
+      async (task): Promise<EstimateResult> => {
+        try {
+          return {
+            kind: "available",
+            candidateId: task.candidate.id,
+            originIndex: task.originIndex,
+            origin: task.origin.requestedName,
+            minutes: await resolveEstimate(
+              signal === undefined
+                ? this.travelTimeAdapter.estimateMinutes(task.origin.station.id, task.candidate.id)
+                : this.travelTimeAdapter.estimateMinutes(
+                    task.origin.station.id,
+                    task.candidate.id,
+                    {
+                      signal,
+                    },
+                  ),
+              signal,
+            ),
+          }
+        } catch (error) {
+          if (options.omitUnavailableCandidates && error instanceof RouteUnavailableError) {
+            return { kind: "unavailable", candidateId: task.candidate.id, error }
+          }
+          throw error
+        }
+      },
     )
 
-    const evaluatedCandidates = candidates.map((candidate) => {
-      const travelTimes = estimates
-        .filter((estimate) => estimate.candidateId === candidate.id)
+    const evaluatedCandidates = candidates.flatMap((candidate) => {
+      const candidateEstimates = estimates.filter(
+        (estimate): estimate is AvailableEstimate =>
+          estimate.kind === "available" && estimate.candidateId === candidate.id,
+      )
+      if (candidateEstimates.length !== origins.length) {
+        return []
+      }
+      const travelTimes = candidateEstimates
         .sort((left, right) => left.originIndex - right.originIndex)
         .map((estimate) => ({ origin: estimate.origin, minutes: estimate.minutes }))
       const minutes = travelTimes.map((travelTime) => travelTime.minutes)
       const averageMinutes = minutes.reduce((total, value) => total + value, 0) / minutes.length
       const maxDifferenceMinutes = Math.max(...minutes) - Math.min(...minutes)
 
-      return {
-        station: candidate.name,
-        travelTimes,
-        averageMinutes: roundToOneDecimal(averageMinutes),
-        maxDifferenceMinutes,
-        fairness: calculateFairnessScore({ averageMinutes, maxDifferenceMinutes }),
-      }
+      return [
+        {
+          station: candidate.name,
+          travelTimes,
+          averageMinutes: roundToOneDecimal(averageMinutes),
+          maxDifferenceMinutes,
+          fairness: calculateFairnessScore({ averageMinutes, maxDifferenceMinutes }),
+        },
+      ]
     })
+    if (options.omitUnavailableCandidates && evaluatedCandidates.length === 0) {
+      const unavailable = estimates.find(
+        (estimate): estimate is UnavailableEstimate => estimate.kind === "unavailable",
+      )
+      if (unavailable !== undefined) {
+        throw unavailable.error
+      }
+    }
     return evaluatedCandidates.sort(compareCandidates)
   }
 }

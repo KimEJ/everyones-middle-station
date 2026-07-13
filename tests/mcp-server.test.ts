@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest"
 import type { TravelTimeAdapter } from "../src/domain.ts"
 import { createMcpServer } from "../src/mcp-server.ts"
 import { createSampleTravelTimeAdapter } from "../src/sample-network.ts"
+import { createSeoulSubwayTravelTimeAdapter } from "../src/seoul-subway-network.ts"
 
 describe("MCP server tools", () => {
   it("lists all three tools and returns structured meeting candidates", async () => {
@@ -33,7 +34,7 @@ describe("MCP server tools", () => {
       )
       expect(result.isError).toBeUndefined()
       expect(result.structuredContent).toMatchObject({
-        algorithm: "수도권 샘플 그래프 최단시간 추정",
+        algorithm: "그래프 기반 최단시간 추정",
       })
       expect(JSON.stringify(result.structuredContent)).toContain('"fairness_score"')
     } finally {
@@ -61,6 +62,32 @@ describe("MCP server tools", () => {
       expect(result.isError).toBe(true)
       expect(result.structuredContent).toMatchObject({
         error: { code: "UnknownStationError" },
+      })
+    } finally {
+      await client.close()
+      await server.close()
+    }
+  })
+
+  it("returns a handled tool error for an ambiguous station name in the DB graph", async () => {
+    // Given
+    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair()
+    const server = createMcpServer(createSeoulSubwayTravelTimeAdapter())
+    await server.connect(serverTransport)
+    const client = new Client({ name: "test-client", version: "0.1.0" })
+    await client.connect(clientTransport)
+
+    try {
+      // When
+      const result = await client.callTool({
+        name: "find_fair_meeting_areas",
+        arguments: { origins: ["양평역", "강남역"] },
+      })
+
+      // Then
+      expect(result.isError).toBe(true)
+      expect(result.structuredContent).toMatchObject({
+        error: { code: "AmbiguousStationError" },
       })
     } finally {
       await client.close()

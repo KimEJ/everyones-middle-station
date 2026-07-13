@@ -10,6 +10,18 @@ export class UnknownStationError extends Error {
   }
 }
 
+export class AmbiguousStationError extends Error {
+  readonly name = "AmbiguousStationError"
+  readonly stationName: string
+  readonly candidates: readonly string[]
+
+  constructor(stationName: string, candidates: readonly string[]) {
+    super(`동일한 이름의 역이 여러 개입니다: ${stationName}. 후보: ${candidates.join(", ")}`)
+    this.stationName = stationName
+    this.candidates = candidates
+  }
+}
+
 export class RouteUnavailableError extends Error {
   readonly name = "RouteUnavailableError"
   readonly originId: StationId

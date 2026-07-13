@@ -2,7 +2,7 @@ import { z } from "zod/v4"
 
 import { RuntimeModeError } from "./errors.ts"
 import { startHttpServer, startStdioServer } from "./runtime.ts"
-import { createSampleTravelTimeAdapter } from "./sample-network.ts"
+import { createDefaultTravelTimeAdapter } from "./sample-network.ts"
 
 const RuntimeConfigSchema = z
   .object({
@@ -28,7 +28,7 @@ async function main(): Promise<void> {
     max_concurrent_requests: process.env["MCP_MAX_CONCURRENT_REQUESTS"],
     request_timeout_ms: process.env["MCP_REQUEST_TIMEOUT_MS"],
   })
-  const travelTimeAdapter = createSampleTravelTimeAdapter()
+  const travelTimeAdapter = createDefaultTravelTimeAdapter()
 
   switch (config.transport) {
     case "http":

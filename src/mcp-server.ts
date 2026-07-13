@@ -2,6 +2,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js"
 
 import type { TravelTimeAdapter } from "./domain.ts"
 import {
+  AmbiguousStationError,
   InvalidNetworkDataError,
   RouteUnavailableError,
   ToolExecutionError,
@@ -57,7 +58,7 @@ export function createMcpServer(
 
         return {
           candidates: serializeCandidates(candidates),
-          algorithm: "수도권 샘플 그래프 최단시간 추정",
+          algorithm: "그래프 기반 최단시간 추정",
         }
       }),
   )
@@ -82,7 +83,7 @@ export function createMcpServer(
               signal,
             ),
           ),
-          algorithm: "수도권 샘플 그래프 최단시간 추정",
+          algorithm: "그래프 기반 최단시간 추정",
         }
       }),
   )
@@ -134,6 +135,7 @@ async function executeTool(operation: () => Promise<Record<string, unknown>>) {
   } catch (error) {
     if (
       error instanceof UnknownStationError ||
+      error instanceof AmbiguousStationError ||
       error instanceof RouteUnavailableError ||
       error instanceof InvalidNetworkDataError ||
       error instanceof TravelTimeLookupTimeoutError
@@ -163,6 +165,7 @@ function successResponse(payload: Record<string, unknown>) {
 function errorResponse(
   error:
     | UnknownStationError
+    | AmbiguousStationError
     | RouteUnavailableError
     | InvalidNetworkDataError
     | TravelTimeLookupTimeoutError

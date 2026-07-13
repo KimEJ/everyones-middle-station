@@ -48,6 +48,38 @@ describe("Streamable HTTP transport", () => {
     }
   })
 
+  it("accepts a managed gateway host when the deployment wildcard is configured", async () => {
+    // Given
+    const runningServer = await startTestServer({ ...TEST_SECURITY, allowedHostnames: ["*"] })
+
+    try {
+      // When
+      const response = await fetch(runningServer.endpoint, {
+        method: "POST",
+        headers: {
+          accept: "application/json, text/event-stream",
+          "content-type": "application/json",
+          host: "managed-gateway.playmcp.example",
+        },
+        body: JSON.stringify({
+          jsonrpc: "2.0",
+          id: "gateway-host-request",
+          method: "initialize",
+          params: {
+            protocolVersion: "2025-11-25",
+            capabilities: {},
+            clientInfo: { name: "gateway-host-test-client", version: "0.1.0" },
+          },
+        }),
+      })
+
+      // Then
+      expect(response.status).toBe(200)
+    } finally {
+      await closeTestServer(runningServer.server)
+    }
+  })
+
   it("rejects a browser origin that is not explicitly allowed", async () => {
     // Given
     const runningServer = await startTestServer(TEST_SECURITY)

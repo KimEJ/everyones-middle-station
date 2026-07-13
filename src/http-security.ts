@@ -33,7 +33,9 @@ export function getAllowedHostHeader(
   if (hostname === undefined) {
     return undefined
   }
-  return allowedHostnames.some((allowedHostname) => hostname === normalizeHostname(allowedHostname))
+  return allowedHostnames.some(
+    (allowedHostname) => allowedHostname === "*" || hostname === normalizeHostname(allowedHostname),
+  )
     ? hostHeader
     : undefined
 }

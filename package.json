@@ -11,9 +11,13 @@
     "dev": "node --watch --enable-source-maps src/index.ts --transport=http",
     "build": "tsc -p tsconfig.build.json",
     "test": "vitest run",
+    "test:mcp": "npm run build && node --enable-source-maps dist/smoke-client.js",
     "start": "node --enable-source-maps dist/index.js --transport=http",
     "typecheck": "tsc --noEmit",
-    "lint": "biome check src tests"
+    "lint": "biome check src tests",
+    "docker:build": "docker build --platform linux/amd64 -t everyones-middle-station:local .",
+    "docker:up": "docker compose up --build",
+    "docker:down": "docker compose down"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",
